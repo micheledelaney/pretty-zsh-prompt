@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+
+# setting colorscheme {{{1
+
+# If we support tput setaf
+if tput setaf 1 &> /dev/null; then
+  # Reset the shell from our `if` check
+  tput sgr0 &> /dev/null
+
+  # Save common color actions
+  bold="$(tput bold)"
+  reset="$(tput sgr0)"
+
+  # colorscheme yellow/red
+  if [[ $COLOR_SCHEME_BASH_PROMPT == "yellow" || $COLOR_SCHEME_BASH_PROMPT == "red" ]]; then
+    color1="$bold$(tput setaf 124)"
+    color2="$bold$(tput setaf 196)"
+    color3="$bold$(tput setaf 202)"
+    color4="$bold$(tput setaf 208)"
+    color5="$bold$(tput setaf 214)"
+    color6="$bold$(tput setaf 220)"
+    color7="$bold$(tput setaf 226)"
+    color8="$bold$(tput setaf 229)"
+    color9="$bold$(tput setaf 230)"
+  # colorscheme blue/beige (default)
+  else
+    color1="$bold$(tput setaf 23)"
+    color2="$bold$(tput setaf 30)"
+    color3="$bold$(tput setaf 37)"
+    color4="$bold$(tput setaf 73)"
+    color5="$bold$(tput setaf 66)"
+    color6="$bold$(tput setaf 102)"
+    color7="$bold$(tput setaf 138)"
+    color8="$bold$(tput setaf 174)"
+    color9="$bold$(tput setaf 210)"
+  fi
+else
+# Otherwise, use ANSI escape sequences for coloring
+# still need to set the one for a not 256 color based set
+  reset='\e[0m'
+  if [[ $COLOR_SCHEME_BASH_PROMPT == "yellow" || $COLOR_SCHEME_BASH_PROMPT == "red" ]]; then
+    # colorscheme red/yellow
+    color1='\033[01;38;5;124m'
+    color2='\033[01;38;5;196m'
+    color3='\033[01;38;5;202m'
+    color4='\033[01;38;5;208m'
+    color5='\033[01;38;5;214m'
+    color6='\033[01;38;5;220m'
+    color7='\033[01;38;5;226m'
+    color8='\033[01;38;5;229m'
+    color7='\033[01;38;5;230m'
+  else
+    # colorscheme blue/beige
+    color1='\033[01;38;5;23m'
+    color2='\033[01;38;5;30m'
+    color3='\033[01;38;5;37m'
+    color4='\033[01;38;5;73m'
+    color5='\033[01;38;5;66m'
+    color6='\033[01;38;5;102m'
+    color7='\033[01;38;5;138m'
+    color8='\033[01;38;5;174m'
+    color9='\033[01;38;5;210m'
+  fi
+fi
+
+if [[ $COLOR_SCHEME_BASH_PROMPT == "red" || $COLOR_SCHEME_BASH_PROMPT == "blue" ]]; then
+  colors=(
+    "$color9"
+    "$color8"
+    "$color7"
+    "$color6"
+    "$color5"
+    "$color4"
+    "$color3"
+    "$color2"
+    "$color1"
+    )
+else
+  colors=(
+    "$color1"
+    "$color2"
+    "$color3"
+    "$color4"
+    "$color5"
+    "$color6"
+    "$color7"
+    "$color8"
+    "$color9"
+    )
+fi 
+
+# 1}}}
+# When as root, use !! as symbol
+if [[ "$UID" == 0 ]]; then
+  symbol="!!"
+# Define the default prompt terminator character '$'
+else
+  symbol="\$"
+fi
+
+# If you want your username to depend on the ENV variable, use this:
+user="[[$USER]]"
+# Otherwise, use this:
+# user="[[$(whoami)]]"
+# git functions {{{1
+# Set up symbols
+synced=""
+dirty_synced="*"
+unpushed="△"
+dirty_unpushed="▲"
+unpulled="▽"
+dirty_unpulled="▼"
+unpushed_unpulled="⬡"
+dirty_unpushed_unpulled="⬢"
+
+function get_git_branch() {
+  # On branches, this will return the branch name
+  # On non-branches, (no branch)
+  ref="$(git symbolic-ref HEAD 2> /dev/null | sed -e 's/refs\/heads\///')"
+  if [[ "$ref" != "" ]]; then
+    echo "$ref"
+  else
+    echo "(no branch)"
+  fi
+}
+
+function is_branch1_behind_branch2 () {
+  # Find the first log (if any) that is in branch1 but not branch2
+  first_log="$(git log "$1".."$2" -1 2> /dev/null)"
+
+  # Exit with 0 if there is a first log, 1 if there is not
+  [[ -n "$first_log" ]]
+}
+
+function branch_exists () {
+  # List remote branches           | # Find our branch and exit with 0 or 1 if found/not found
+  git branch --remote 2> /dev/null | grep --quiet "$1"
+}
+
+function parse_git_ahead () {
+  # Grab the local and remote branch
+  branch="$(get_git_branch)"
+  remote="$(git config --get "branch.${branch}.remote" || echo -n "origin")"
+  remote_branch="$remote/$branch"
+  # If the remote branch is behind the local branch
+  # or it has not been merged into origin (remote branch doesn't exist)
+  if (is_branch1_behind_branch2 "$remote_branch" "$branch" ||
+      ! branch_exists "$remote_branch"); then
+    # echo our character
+    echo 1
+  fi
+}
+
+function parse_git_behind () {
+  # Grab the branch
+  branch="$(get_git_branch)"
+  remote="$(git config --get "branch.${branch}.remote" || echo -n "origin")"
+  remote_branch="$remote/$branch"
+  # If the local branch is behind the remote branch
+  if is_branch1_behind_branch2 "$branch" "$remote_branch"; then
+    # echo our character
+    echo 1
+  fi
+}
+
+function parse_git_dirty() {
+  # If the git status has *any* changes (e.g. dirty), echo our character
+  if [[ -n "$(git status --porcelain 2> /dev/null)" ]]; then
+    echo 1
+  fi
+}
+
+function is_on_git() {
+  # Checks if the currect working directory is a git repo
+  git rev-parse 2> /dev/null
+}
+
+function get_git_status() {
+  # Grab the git dirty and git behind
+  dirty_branch="$(parse_git_dirty)"
+  branch_ahead="$(parse_git_ahead)"
+  branch_behind="$(parse_git_behind)"
+
+  # Iterate through all the cases and if it matches, then echo
+  if [[ "$dirty_branch" == 1 && "$branch_ahead" == 1 && "$branch_behind" == 1 ]]; then
+    echo "$dirty_unpushed_unpulled"
+  elif [[ "$branch_ahead" == 1 && "$branch_behind" == 1 ]]; then
+    echo "$unpushed_unpulled"
+  elif [[ "$dirty_branch" == 1 && "$branch_ahead" == 1 ]]; then
+    echo "$dirty_unpushed"
+  elif [[ "$branch_ahead" == 1 ]]; then
+    echo "$unpushed"
+  elif [[ "$dirty_branch" == 1 && "$branch_behind" == 1 ]]; then
+    echo "$dirty_unpulled"
+  elif [[ "$branch_behind" == 1 ]]; then
+    echo "$unpulled"
+  elif [[ "$dirty_branch" == 1 ]]; then
+    echo "$dirty_synced"
+  else # clean
+    echo "$synced"
+  fi
+}
+
+function get_git_info () {
+  # Grab the branch
+  branch="$(get_git_branch)"
+
+  # If there are any branches
+  if [[ "$branch" != "" ]]; then
+    # Echo the branch
+    output="$branch"
+    # Echo our output
+    echo "$output"
+  fi
+}
+
+# 1}}}
+# populate color_array {{{1
+
+len_name=${#user}
+# Gets the middle of the name
+middle_of_name=$((len_name/2))
+# When the nbr of characters in the name is even, set the two in the middle
+# as middle
+if [[ $((middle_of_name*2)) == "$len_name" ]]; then
+  middle_of_name2=$((middle_of_name - 1))
+# Otherwise both are the same value
+else
+  middle_of_name2=$middle_of_name
+fi
+# Gets the nbr of colors that are available
+nbr_colors=$((${#colors[@]} - 1))
+# The array color_array consists of as many colors as there are characters
+# in the username. It starts populating it from the middle and goes
+# simultaniously up and down.
+color_array=()
+for (( i=0; i<=middle_of_name; i++ )); do
+  if [[ $(($((i / nbr_colors))%2)) == 0 ]]; then
+    index=$((i % nbr_colors))
+  else
+    index=$((nbr_colors - $((i % nbr_colors))))
+  fi
+  up=$((middle_of_name + i))
+  down=$((middle_of_name2 - i))
+  color_array[${up}]=${colors[$nbr_colors - $index]}
+  color_array[${down}]=${colors[$nbr_colors - $index]}
+  if [[ $i == "$middle_of_name" ]]; then
+    color_array[$((up + 1))]=${colors[$nbr_colors - $index]}
+    color_array[$((up + 2))]=${colors[$nbr_colors - $index]}
+    color_array[$((up + 3))]=${colors[$nbr_colors - $index]}
+  fi
+done
+
+# 1}}}
+# set PS1 {{{1
+# Iterates through the name and echoes each character at a time in color
+function get_name() {
+  for (( i=0; i<${#1}; i++ ));
+    do echo -n "${color_array[$i]}${1:$i:1} "
+  done
+}
+
+function print_colorscheme() {
+  for (( i=0; i<${#colors[@]}; i++ )); do
+    echo "${colors[$i]}color: $i"
+  done
+}
+
+# setting the color of the directory
+if [[ -z "$DIR_COLOR" ]]; then
+  dir_color=${color_array[$len_name]}
+else
+  dir_color=${colors[$DIR_COLOR]}
+fi
+
+# setting the branch color
+if [[ -z "$BRANCH_COLOR" ]]; then
+  branch_color=${color_array[$len_name]}
+else
+  branch_color=${colors[$BRANCH_COLOR]}
+fi
+
+# If 256 colors
+PS1="\[$reset\]\$(get_name $user) \
+\[${color_array[$len_name]}\]in  \
+\[$dir_color\]\w  \
+\$( is_on_git && \
+echo -n \"\[${color_array[$len_name]}\]on  \" && \
+echo -n \"\[$branch_color\]\$(get_git_info)\" && \
+echo -n \"\[${color_array[$len_name]}\] \$(get_git_status)\" && \
+echo -n \"\[${color_array[$len_name]}\]\")\n\[${color_array[0]}\]$symbol \[$reset\]"
+# 1}}}
