@@ -30,7 +30,7 @@ There are four available colorschemes:
 
 By default 'rose' is set but you can easily change it by setting the COLOR_SCHEME_zsh_PROMPT variable to the colorscheme you want.  
 Example:  
-`export COLOR_SCHEME_zsh_PROMPT="blue"`  
+`export COLOR_SCHEME_ZSH_PROMPT="blue"`  
 Just add that line in your .zshrc before it sources the .pretty_zsh_prompt file.  
 ![colorschemes](https://github.com/cmicheledelaney/pretty-zsh-prompt/blob/master/screenshot_colorschemes.png)  
   
