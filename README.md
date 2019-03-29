@@ -1,6 +1,5 @@
 # pretty-zsh-prompt
 ![screenshot pretty zsh prompt](https://github.com/cmicheledelaney/pretty-zsh-prompt/blob/master/screenshot_pretty_zsh_prompt.png)  
-Based on [sexy_zsh_prompt by twolfson](https://github.com/twolfson/sexy-zsh-prompt)  
   
   
 A zsh prompt with the username, the current working directory and the git branch as well as the statuses.
